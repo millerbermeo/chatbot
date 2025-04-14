@@ -1,8 +1,8 @@
 import express, { Response } from "express";
 import cors from 'cors';
 import  config  from "./configs/env";
-import { pool } from "./database/conexion";
-import { authenticate } from "./middlewares/auth.middleware";
+// import { pool } from "./database/conexion";
+// import { authenticate } from "./middlewares/auth.middleware";
 
 import rutaUsuarios from './routes/usuario.routes';
 import authRouter from "./routes/auth.routes";
@@ -42,14 +42,14 @@ app.use('/api/productos', rutaProductos);
 
 
 
-(async () => {
-  try {
-    await pool.query("SELECT 1");
-    console.log("Conexión establecida");
-  } catch (error) {
-    console.error("Error de conexión: ", error);
-  }
-})();
+// (async () => {
+//   try {
+//     await pool.query("SELECT 1");
+//     console.log("Conexión establecida");
+//   } catch (error) {
+//     console.error("Error de conexión: ", error);
+//   }
+// })();
 
 // Iniciar el servidor
 app.listen(port, () => {
