@@ -20,6 +20,24 @@ class WhatsappService {
 
         await sendToWhatsapp(data)
     }
+
+
+    async sendInteractiveButtons(to: string, bodyText: string, buttons: any) {
+        const data = {
+          messaging_product: 'whatsapp',
+          to,
+          type: 'interactive',
+          interactive: {
+            type: 'button',
+            body: { text: bodyText },
+            action: {
+              buttons: buttons,
+            },
+          },
+        };
+    
+        await sendToWhatsapp(data);
+      }
 }
 
 export default new WhatsappService()

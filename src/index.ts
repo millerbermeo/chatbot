@@ -7,6 +7,8 @@ import { authenticate } from "./middlewares/auth.middleware";
 import rutaUsuarios from './routes/usuario.routes';
 import authRouter from "./routes/auth.routes";
 import webhookRouter from "./routes/web-hook.routes";
+import rutaProductos from './routes/productos.routes';
+
 
 
 const app = express();
@@ -34,6 +36,7 @@ app.use("/", webhookRouter);
 
 // Rutas protegidas (requieren autenticación)
 app.use('/api/usuarios', rutaUsuarios);
+app.use('/api/productos', rutaProductos);
 
 
 

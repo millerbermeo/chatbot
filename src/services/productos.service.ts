@@ -43,7 +43,31 @@ export class ProductosServices {
     
         return `📦 *Producto Disponible*\n\n🔹 *Nombre:* ${nombre}\n📜 *Descripción:* ${descripcion}\n💰 *Precio Unidad:* $${precio}\n📦 *Stock Disponible:* ${cantidad}\n📍 *Ubicación:* ${ubicacion}`;
     }
+
+    async obtenerProductoNombre(id: string) {
+        const query = `
+            SELECT p.nombre, p.descripcion, p.precio, s.cantidad, s.ubicacion 
+            FROM public.productos p
+            INNER JOIN stock s ON s.producto_id = p.id
+            WHERE p.id = $1
+        `;
     
+        const result = await pool.query(query, [id]);
+    
+        if (result.rows.length === 0) {
+            return "⚠️ Producto no encontrado.";
+        }
+    
+        const { nombre, descripcion, precio, cantidad, ubicacion } = result.rows[0];
+    
+        return `${nombre}`;
+    }
+    
+    async obtenerProducto2(id: string): Promise<Producto | null> {
+        const query = 'SELECT * FROM public.productos WHERE id = $1';
+        const result = await pool.query(query, [id]);
+        return result.rows.length > 0 ? result.rows[0] : null;
+    }
     
     async actualizarProducto(id: string, dto: UpdateProductoDto): Promise<Producto> {
 

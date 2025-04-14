@@ -7,19 +7,18 @@ import { Usuario } from "../models/usuario.interface";
 
 export class UsuarioServices {
 
-    async crearNuevoUsuario(dto: CreateUsuarioDto): Promise<Usuario> {
+    async crearNuevoUsuario(dto: any): Promise<Usuario> {
         try {
-            const { nombre, edad, correo, password, direccion, rol, estado } = dto;
+            const { nombre, email, telefono, direccion } = dto;
 
-            const estadoFinal = estado || EstadoUsuario.activo;
 
             const query = `
-            INSERT INTO public.usuarios (nombre, edad, correo, password, direccion, rol, estado)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO public.clientes (nombre, email, telefono, direccion)
+            VALUES ($1, $2, $3, $4)
             RETURNING *;
         `;
 
-            const values = [nombre, edad, correo, password, direccion, rol, estadoFinal];
+            const values = [nombre, email, telefono, direccion];
             const result = await pool.query(query, values);
 
             return result.rows[0];
@@ -41,21 +40,14 @@ export class UsuarioServices {
         }
 
     async obtenerUsuario(id: string): Promise<Producto | null> {
-        try {
     
-            const query = 'SELECT * FROM public.usuarios WHERE id = $1;'
+            const query = 'SELECT * FROM public.clientes WHERE id = $1;'
 
             const result = await pool.query(query, [id])
 
             return result.rows ? result.rows[0] : null
 
-        } catch (error) {
-            if (error instanceof Error) {
-                console.error("Error al obtener usuario:", error.message);
-                throw new Error("No se pudo obtener el usuario.");
-            }
-            throw new Error("Ocurrió un error inesperado.");
-        }
+ 
     }
 
 

@@ -1,153 +1,206 @@
-// import whatsappService from "./whatsapp.service"
-
-// class MessageHandler {
-
-//     constructor() {
-//         // this.appointmentState = {}
-//         // this.assistandState = {}
-//     }
-
-//     async handleIncomingMessage(message: any, senderInfo: any) {
-//         console.log("📝 Procesando mensaje:", message.text?.body);
-
-//         if (message?.type === "text") {
-//             const incomingMessage = message.text.body.toLowerCase().trim();
-
-//             if (this.isGreeting(incomingMessage)) {
-//                 await this.sendWelcomeMessage(message.from, message.id, senderInfo); // ❌ Quité senderInfo()
-//             } 
-
-//             await whatsappService.markAsRead(message.id);
-//         }
-//     }
-
-
-//     isGreeting(message: string) {
-//         const greetings = ["hola", "hello", 'hi', 'buenas tardes', 'buenos dias']
-//         return greetings.includes(message)
-//     }
-
-//     getSenderName(senderInfo: any) {
-//         return senderInfo.profile?.name || senderInfo.wa_id
-//     }
-
-//     async sendWelcomeMessage(to: string, messageId: string, senderInfo: any) {
-//         const name = this.getSenderName(senderInfo)
-//         const welcomeMessage = `Hola ${name}, Bienvenido como puedo ayudarte hoy?`
-//         await  whatsappService.sendMessage(to, welcomeMessage, messageId)
-//     }
-// }
-
-// export default new MessageHandler()
-
-
 import whatsappService from "./whatsapp.service";
-import OpenAI from "openai";
-import config from "../configs/env"; // Asegúrate de tener la API_KEY en tu configuración
-import CategoriasService from "./categorias.service";
-import { ProductosServices } from "./productos.service";
 
-const palabrasClave = [
-    "producto", "productos", "artículo", "artículos", "mercancía", "mercadería", "ítem", "ítems", "catálogo", "inventario",
-    "quiero ver productos", "ver productos", "mostrar productos", "dame productos", "lista de productos",
-    "catálogo de productos", "qué productos tienes", "qué vendes", "qué tienes en venta",
-    "mostrar catálogo", "enséñame los productos", "dime qué tienes"
-];
+class ChatbotDomicilios {
+  private estados: Record<
+    string,
+    {
+      paso: string;
+      pedido?: string;
+      direccionRecogida?: string;
+      direccionEntrega?: string;
+    }
+  > = {};
 
-class MessageHandler {
-    private openai: OpenAI;
-    private categoriasServices: CategoriasService;
-    private productosServices: ProductosServices;
+  private async handleEmpresaResponse(message: any) {
+    const respuesta = message?.interactive?.button_reply?.title?.toLowerCase();
+    if (!respuesta) return;
 
-    constructor() {
-        this.openai = new OpenAI({ apiKey: config.openai.apiKey });
-        this.categoriasServices = new CategoriasService();
-        this.productosServices = new ProductosServices();
+    if (respuesta === "aceptar") {
+      const ahora = new Date();
+      const horaEntrega = new Date(ahora.getTime() + 30 * 60000); // 30 minutos después
+      const formatoHora = horaEntrega.toLocaleTimeString("es-CO", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 
+      await whatsappService.sendMessage(
+        "573232205900",
+        `✅ Pedido aceptado. Tienes *30 minutos* a partir de ahora para entregar el pedido. Hora límite estimada: *${formatoHora}*`
+      );
+    } else if (respuesta === "rechazar") {
+      await whatsappService.sendMessage(
+        "573232205900",
+        `❌ Pedido rechazado. Se notificará al cliente.`
+      );
+    }
+  }
+
+  async handleIncomingMessage(message: any) {
+    const texto =
+      message?.text?.body?.trim().toLowerCase() ||
+      message?.interactive?.button_reply?.title?.trim().toLowerCase();
+
+    const from = message.from;
+    if (!texto) return;
+
+    // 👇 Verifica si es el número fijo (empresa)
+    if (from === "573232205900") {
+      await this.handleEmpresaResponse(message);
+      return;
     }
 
-    async handleIncomingMessage(message: any, senderInfo: any) {
-        console.log("📝 Procesando mensaje:", message.text?.body);
+    const estadoActual = this.estados[from] || { paso: "inicio" };
 
-        if (message?.type === "text") {
+    switch (estadoActual.paso) {
+        case "inicio":
+            this.estados[from] = { paso: "esperando_confirmacion" };
+            const botonesInicio = [
+              { type: "reply", reply: { id: "si", title: "Sí" } },
+              { type: "reply", reply: { id: "convenio", title: "Convenio" } },
+              { type: "reply", reply: { id: "no", title: "No" } },
+            ];
+            await whatsappService.sendInteractiveButtons(
+              from,
+              "👋 ¡Hola! Bienvenido a *Domicilios Express* 🚴‍♂️\n¿Deseas hacer un pedido? 🛍️",
+              botonesInicio
+            );
+            break;
 
-            const incomingMessage = message.text.body.trim(); // No lo convertimos en minúscula para preservar formato
-            let response = ''
+      case "esperando_confirmacion":
+        if (texto.includes("sí") || texto.includes("si") || texto.includes("quiero")) {
+          this.estados[from].paso = "esperando_pedido";
+          await whatsappService.sendMessage(
+            from,
+            `✅ ¡Perfecto! Por favor escribe tu pedido y nosotros lo realizaremos por ti 🛍️\n\n🛒 Puedes ver nuestro catálogo aquí:\nhttps://e-commerce-front-theta.vercel.app/`,
+            message.id
+          );
+        } else if (texto.includes("convenio")) {
+          const nombreContacto = message?.contacts?.[0]?.profile?.name || "cliente";
+          const resumen = `📢 *Tienes un domicilio por convenio*\n\n👤 Convenio: *${nombreContacto}*\n📞 Número: *${from}*`;
 
-            if (this.isGreeting(incomingMessage)) {
-                response = `📢 ¡Bienvenido a CPUTECH! 🚀\n Hola 👋, gracias por contactarnos. Somos tu tienda de tecnología de confianza. 💻📱🎧\n\n🔹¿Buscas un nuevo gadget, laptop o accesorio?\n🔹¿Necesitas ayuda para encontrar el producto ideal?\n\n ¡Estamos aquí para asesorarte! 😊\n Escríbenos y con gusto te ayudaremos. 💬✨\n\n Visita nuestro catálogo online: https://www.tutienda.com`;
-            }
+          const buttons = [
+            { type: "reply", reply: { id: "aceptar", title: "Aceptar" } },
+            { type: "reply", reply: { id: "rechazar", title: "Rechazar" } },
+          ];
 
+          await whatsappService.sendMessage(
+            from,
+            `🚀 Su domicilio fue confirmado automáticamente, *${nombreContacto}*. En breve un repartidor pasará a recogerlo. 🙌`
+          );
 
-            if (this.isProductos(incomingMessage)) {
-                response = "✨ ¡Descubre nuestros productos disponibles! ✨\n\n🌐 Explora nuestro catálogo aquí:\n🔗 https://www.exito.com/tecnologia/computadores/portatiles\n\nSi alguno te interesa o necesitas más información, no dudes en escribirnos. ¡Estamos aquí para ayudarte! 😊";
-            }
+          await whatsappService.sendInteractiveButtons("573232205900", resumen, buttons);
 
-            if (!isNaN(Number(incomingMessage))) {
-                response = await this.productosServices.obtenerProducto(incomingMessage);
-            }
-
-            // const response = await this.handleAIResponse(incomingMessage);
-
-
-
-
-
-            await whatsappService.sendMessage(message.from, response, message.id);
-            await whatsappService.markAsRead(message.id);
+          delete this.estados[from];
+        } else {
+          await whatsappService.sendMessage(
+            from,
+            `🙌 Ok, si cambias de opinión solo escribe "sí" para continuar.`,
+            message.id
+          );
         }
-    }
+        break;
 
-    async handleAIResponse(userMessage: string): Promise<string> {
-        try {
-            const response = await this.openai.chat.completions.create({
-                model: "gpt-4o",
-                messages: [
-                    { role: "system", content: "Te llamas Miller y eres un asistente virtual." },
-                    { role: "user", content: userMessage }
-                ],
-            });
+      case "esperando_pedido":
+        if (texto.charAt(0) === "#") {
+          // Pedido rápido, sin dirección de recogida
+          this.estados[from].pedido = texto.substring(1).trim(); // sin #
+          this.estados[from].direccionRecogida = "NO APLICA (Convenio)";
+          this.estados[from].paso = "esperando_direccion_entrega";
 
-            // Verifica que la respuesta tenga contenido válido
-            const aiMessage = response.choices?.[0]?.message?.content?.trim();
-            return aiMessage || "Lo siento, no pude generar una respuesta en este momento.";
+          await whatsappService.sendMessage(
+            from,
+            `📦 ¿A qué dirección debemos entregar el pedido?`,
+            message.id
+          );
+        } else {
+          this.estados[from].pedido = texto;
+          this.estados[from].paso = "esperando_direccion_recogida";
 
-        } catch (error) {
-            console.error("❌ Error con OpenAI:", error);
-            return "Hubo un problema al procesar tu mensaje. Inténtalo de nuevo.";
+          await whatsappService.sendMessage(
+            from,
+            `📍 ¿Desde qué dirección debemos recoger el pedido?`,
+            message.id
+          );
         }
-    }
+        break;
 
+      case "esperando_direccion_recogida":
+        this.estados[from].direccionRecogida = texto;
+        this.estados[from].paso = "esperando_direccion_entrega";
+        await whatsappService.sendMessage(
+          from,
+          `📦 ¿A qué dirección debemos entregar el pedido?`,
+          message.id
+        );
+        break;
 
+      case "esperando_direccion_entrega":
+        this.estados[from].direccionEntrega = texto;
+        this.estados[from].paso = "confirmacion_final";
 
-    isProductos(message: string) {
-        return palabrasClave.some(palabra => message.toLowerCase().includes(palabra));
-    }
-
-
-    isGreeting(message: string) {
-        const greetings = [
-            "hola", "hello", "hi", "hey", "qué tal", "buenas", "saludos", "buen día", "buenos días",
-            "buenas tardes", "buenas noches", "qué onda", "cómo estás", "cómo va", "qué hay", "qué hubo",
-            "qué pasa", "qué más", "alo", "holi", "holis", "holis", "holita", "holiwis"
+        const buttons = [
+          { type: "reply", reply: { id: "si", title: "Sí" } },
+          { type: "reply", reply: { id: "no", title: "No" } },
         ];
-    
-        // Normalizamos el mensaje y los saludos para eliminar tildes y hacer una comparación consistente
-        const normalizedMessage = message.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    
-        // Recorremos los saludos y verificamos si están contenidos en el mensaje
-        return greetings.some(greeting => normalizedMessage.includes(greeting.normalize("NFD").replace(/[\u0300-\u036f]/g, "")));
+        const resumen = `📝 Pedido: *${this.estados[from].pedido}*\n📍 Recoger en: *${this.estados[from].direccionRecogida}*\n📦 Entregar en: *${this.estados[from].direccionEntrega}*`;
+
+        await whatsappService.sendInteractiveButtons(
+          from,
+          `${resumen}\n\n¿Confirmas estos datos? (sí/no)`,
+          buttons
+        );
+        break;
+
+        case "confirmacion_final":
+            if (texto.includes("sí") || texto.includes("si")) {
+              const datos = this.estados[from];
+          
+              // Si el pedido fue por convenio (#), usa un nombre de local en la dirección de recogida para la empresa
+              const direccionRecogidaParaEmpresa = datos.direccionRecogida === "NO APLICA (Convenio)"
+                ? "Restaurante Calle Primera" // aquí cambias el nombre del local según convenga
+                : datos.direccionRecogida;
+          
+              const resumen = `📢 *Tienes un nuevo domicilio pendiente*\n\n🛍️ Pedido: *${datos.pedido}*\n📍 Dirección de recogida: *${direccionRecogidaParaEmpresa}*\n📦 Dirección de entrega: *${datos.direccionEntrega}*\n👤 Cliente: *${from}*`;
+          
+              await whatsappService.sendMessage(
+                from,
+                `🚀 ¡Pedido confirmado! En breve un repartidor pasará a recogerlo.\nGracias por confiar en *Domicilios Express* 🙌`,
+                message.id
+              );
+          
+              const buttons = [
+                { type: "reply", reply: { id: "aceptar", title: "Aceptar" } },
+                { type: "reply", reply: { id: "rechazar", title: "Rechazar" } },
+              ];
+          
+              await whatsappService.sendInteractiveButtons(
+                "573232205900",
+                resumen,
+                buttons
+              );
+          
+              delete this.estados[from];
+            } else {
+              this.estados[from].paso = "esperando_pedido";
+              await whatsappService.sendMessage(
+                from,
+                `❌ Ok, pedido cancelado. Por favor escribe nuevamente tu pedido.`,
+                message.id
+              );
+            }
+            break;
+
+      default:
+        await whatsappService.sendMessage(
+          from,
+          `🤖 Lo siento, no entendí tu mensaje. Escribe "hola" para comenzar.`,
+          message.id
+        );
+        break;
     }
-    
-    
 
-
-
-    // isProductosId(message: string) {
-    //     return palabrasClave.some(palabra => message.toLowerCase().includes(palabra));
-    // }
-
-
+    await whatsappService.markAsRead(message.id);
+  }
 }
 
-export default new MessageHandler();
+export default new ChatbotDomicilios();

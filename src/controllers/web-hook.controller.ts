@@ -14,7 +14,7 @@ class WebhookController {
         console.log("👤 Información del remitente:", senderInfo);
     
         if (message) {
-            await messageHandler.handleIncomingMessage(message, senderInfo);
+            await messageHandler.handleIncomingMessage(message);
         }
     
         res.sendStatus(200);
@@ -31,7 +31,7 @@ class WebhookController {
             console.log('Webhook verificado !!!!!')
         } else {
             res.sendStatus(403)
-        }
+        }3
     }
 }
 
