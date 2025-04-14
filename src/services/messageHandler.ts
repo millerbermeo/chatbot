@@ -52,19 +52,27 @@ class ChatbotDomicilios {
     const estadoActual = this.estados[from] || { paso: "inicio" };
 
     switch (estadoActual.paso) {
-        case "inicio":
-            this.estados[from] = { paso: "esperando_confirmacion" };
-            const botonesInicio = [
-              { type: "reply", reply: { id: "si", title: "Sí" } },
-              { type: "reply", reply: { id: "convenio", title: "Convenio" } },
-              { type: "reply", reply: { id: "no", title: "No" } },
-            ];
-            await whatsappService.sendInteractiveButtons(
-              from,
-              "👋 ¡Hola! Bienvenido a *Domicilios Express* 🚴‍♂️\n¿Deseas hacer un pedido? 🛍️",
-              botonesInicio
-            );
-            break;
+      case "inicio":
+        if (["hola", "buenas", "hey"].some((s) => texto.includes(s))) {
+          this.estados[from] = { paso: "esperando_confirmacion" };
+          const buttons = [
+            { type: "reply", reply: { id: "si", title: "Sí" } },
+            { type: "reply", reply: { id: "convenio", title: "Convenio" } },
+            { type: "reply", reply: { id: "no", title: "No" } },
+          ];
+          await whatsappService.sendInteractiveButtons(
+            from,
+            "👋 ¡Hola! Bienvenido a *Domicilios Express* 🚴‍♂️\n¿Deseas hacer un pedido? 🛍️",
+            buttons
+          );
+        } else {
+          await whatsappService.sendMessage(
+            from,
+            `👋 Hola, escribe "hola" para iniciar tu pedido.`,
+            message.id
+          );
+        }
+        break;
 
       case "esperando_confirmacion":
         if (texto.includes("sí") || texto.includes("si") || texto.includes("quiero")) {
